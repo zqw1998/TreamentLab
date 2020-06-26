@@ -330,14 +330,13 @@ def xgboost_model(df):
                 inner_X_train, inner_X_validation = X_train[inner_train_idx],X_train[validation_idx]
 
                 selection_model = xgb.XGBClassifier(objective="binary:logistic", n_jobs = -1)
-                selector = RFE(selection_model, n_features_to_select= n_features, step = 100)
+                selector = RFE(selection_model, n_features_to_select= n_features, step = 1)
                 selector = selector.fit(inner_X_train, inner_y_train)
 
                 inner_y_pred_proba[validation_idx] = selector.predict_proba(inner_X_validation)[:,1]
                 validation_scores.append(get_validation_score(inner_groups,validation_idx,inner_y_pred_proba))
             grid_scores[n_features] = np.mean(validation_scores)
-            if n_features == 10:
-                break
+
 
 
         plt.figure()
@@ -362,13 +361,13 @@ def xgboost_model(df):
         logfile.write("Features Chosen:"+chosen_features_str+"\n")
 
 
-        y_pred_proba[test_idx] = estimator.predict_proba(X_test)[:,1]
+        y_pred_proba[test_idx] = rfe.predict_proba(X_test)[:,1]
         test_error.append(get_validation_score(groups, test_idx,y_pred_proba))
         #feature_importance = np.append(feature_importance, [estimator.feature_importances_], axis = 0)
 
         outer_fold += 1
-        print("Generalized Error to this Point:",np.mean(test_error)*100)
-        logfile.write("Generalized Error to this Point: "+str(np.mean(test_error)*100)+"\n")
+        print("Generalized Accuracy to this Point:",np.mean(test_error)*100)
+        logfile.write("Generalized Accuracy to this Point: "+str(np.mean(test_error)*100)+"\n")
         logfile.write("\n\n")
         print()
     print("Outer CV Accuracy:"+str(np.mean(test_error)*100))
