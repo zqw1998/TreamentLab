@@ -18,7 +18,6 @@ from sklearn.metrics import precision_score, accuracy_score, recall_score, f1_sc
 from sklearn.utils.multiclass import unique_labels
 from sklearn.feature_selection import RFECV, RFE
 from itertools import compress
-from multiprocessing import Process, Manager
 
 
 # In[28]:
@@ -286,23 +285,6 @@ def get_validation_score(groups, test_idx, y_pred_proba):
             correct_pred += 1
     return correct_pred/total
 
-def multiprocessing_func(grid_scores, n_features, inner_groups,X_train,y_train):
-    print("Trying", n_features,"features...")
-    validation_scores = []
-    group_kfold = GroupKFold(n_splits = 5)
-    inner_y_pred_proba = np.zeros(inner_groups.shape[0])
-
-    for inner_train_idx, validation_idx in group_kfold.split(X_train,y_train,inner_groups):
-        inner_y_train, inner_y_validation = y_train[inner_train_idx], y_train[validation_idx]
-        inner_X_train, inner_X_validation = X_train[inner_train_idx],X_train[validation_idx]
-
-        selection_model = xgb.XGBClassifier(objective="binary:logistic", n_jobs = -1)
-        selector = RFE(selection_model, n_features_to_select= n_features, step = 1)
-        selector = selector.fit(inner_X_train, inner_y_train)
-
-        inner_y_pred_proba[validation_idx] = selector.predict_proba(inner_X_validation)[:,1]
-        validation_scores.append(get_validation_score(inner_groups,validation_idx,inner_y_pred_proba))
-    grid_scores[n_features] = np.mean(validation_scores)
 
 # In[30]:
 
@@ -332,6 +314,7 @@ def xgboost_model(df):
         y_train, y_test = y[train_idx], y[test_idx]
 
         inner_groups = df.loc[train_idx,'record_id']
+        group_kfold = GroupKFold(n_splits = 5)
 
         grid_scores = {}
         for n_features in range(1, len(attributes)+1):
