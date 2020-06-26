@@ -330,12 +330,14 @@ def xgboost_model(df):
                 inner_X_train, inner_X_validation = X_train[inner_train_idx],X_train[validation_idx]
 
                 selection_model = xgb.XGBClassifier(objective="binary:logistic", n_jobs = -1)
-                selector = RFE(selection_model, n_features_to_select= n_features, step = 50)
+                selector = RFE(selection_model, n_features_to_select= n_features, step = 100)
                 selector = selector.fit(inner_X_train, inner_y_train)
 
                 inner_y_pred_proba[validation_idx] = selector.predict_proba(inner_X_validation)[:,1]
                 validation_scores.append(get_validation_score(inner_groups,validation_idx,inner_y_pred_proba))
             grid_scores[n_features] = np.mean(validation_scores)
+            if n_features == 10:
+                break
 
 
         plt.figure()
