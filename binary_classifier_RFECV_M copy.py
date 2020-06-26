@@ -289,6 +289,7 @@ def get_validation_score(groups, test_idx, y_pred_proba):
 # In[30]:
 
 def xgboost_model(df):
+    logfile = open('log.txt', 'a+')
 
     attributes = list(df.columns)
     attributes.remove('improve_0.5')
@@ -309,7 +310,7 @@ def xgboost_model(df):
 
     outer_fold = 1
     for train_idx, test_idx in logo.split(X,y,groups):
-        print("[ Outer Fold",outer_fold,"]")
+        logfile.write("[ Outer Fold"+str(outer_fold)+"]")
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
 
@@ -318,7 +319,7 @@ def xgboost_model(df):
 
         grid_scores = {}
         for n_features in range(1, len(attributes)+1):
-            print("Trying", n_features,"features...")
+            logfile.write("Trying"+str(n_features)+"features...")
             validation_scores = []
             inner_y_pred_proba = np.zeros(inner_groups.shape[0])
 
@@ -342,15 +343,16 @@ def xgboost_model(df):
         plt.savefig('cv_performance'+outer_fold+'.png')
 
         optimal_n_features = max(grid_scores.items(), key=operator.itemgetter(1))[0]
-        print("Optimal number of features:", optimal_n_features)
-        print("Inner CV Score:", max(grid_scores.item()))
+        logfile.write("Optimal number of features:"+str(optimal_n_features))
+        logfile.write("Inner CV Score:"+str(max(grid_scores.values())))
 
 
         estimator = xgb.XGBClassifier(objective="binary:logistic", n_jobs = -1)
         rfe = RFE(estimator, n_features_to_select= optimal_n_features, step = 1)
         rfe = rfe.fit(X_train, y_train)
         chosen_features = list(compress(attributes, rfe.support_))
-        print("Features Chosen:",chosen_features)
+        chosen_features_str = ','.join(chosen_features)
+        logfile.write("Features Chosen:"+chosen_features_str)
 
 
         y_pred_proba[test_idx] = estimator.predict_proba(X_test)[:,1]
@@ -358,13 +360,15 @@ def xgboost_model(df):
         #feature_importance = np.append(feature_importance, [estimator.feature_importances_], axis = 0)
 
         outer_fold += 1
-        print()
+        
 
-    print("Outer CV Accuracy:",np.mean(test_error)*100)
-
-    print(confusion_matrix(true_improve, pred_improve, labels=[0,1]))
-    print("Precision Score:",precision_score(true_improve,pred_improve))
-    print("Recall Score:",recall_score(true_improve,pred_improve))
+    logfile.write("Outer CV Accuracy:"+str(np.mean(test_error)*100))
+    try:
+        logfile.write(confusion_matrix(true_improve, pred_improve, labels=[0,1]))
+    except:
+        pass
+    logfile.write("Precision Score:"+str(precision_score(true_improve,pred_improve)))
+    logfile.write("Recall Score:"+str(recall_score(true_improve,pred_improve)))
 
 
 xgboost_model(df)
