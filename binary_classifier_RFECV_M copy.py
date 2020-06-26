@@ -330,7 +330,7 @@ def xgboost_model(df):
                 inner_X_train, inner_X_validation = X_train[inner_train_idx],X_train[validation_idx]
 
                 selection_model = xgb.XGBClassifier(objective="binary:logistic", n_jobs = -1)
-                selector = RFE(selection_model, n_features_to_select= n_features, step = 1)
+                selector = RFE(selection_model, n_features_to_select= n_features, step = 50)
                 selector = selector.fit(inner_X_train, inner_y_train)
 
                 inner_y_pred_proba[validation_idx] = selector.predict_proba(inner_X_validation)[:,1]
@@ -342,7 +342,7 @@ def xgboost_model(df):
         plt.xlabel("Number of features selected")
         plt.ylabel("Cross validation score (nb of correct classifications)")
         plt.plot(range(1, len(grid_scores) + 1), list(grid_scores.values()))
-        plt.savefig('cv_performance'+outer_fold+'.png')
+        plt.savefig('cv_performance'+str(outer_fold)+'.png')
 
         optimal_n_features = max(grid_scores.items(), key=operator.itemgetter(1))[0]
         print("Optimal number of features:"+str(optimal_n_features))
