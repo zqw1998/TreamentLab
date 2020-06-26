@@ -333,7 +333,6 @@ def xgboost_model(df):
                 inner_y_pred_proba[validation_idx] = selector.predict_proba(inner_X_validation)[:,1]
                 validation_scores.append(get_validation_score(inner_groups,validation_idx,inner_y_pred_proba))
             grid_scores[n_features] = np.mean(validation_scores)
-            sys.stdout.flush()
 
 
         plt.figure()
@@ -360,12 +359,12 @@ def xgboost_model(df):
 
         outer_fold += 1
         print()
-        sys.stdout.flush()
+
     print("Outer CV Accuracy:",np.mean(test_error)*100)
 
     print(confusion_matrix(true_improve, pred_improve, labels=[0,1]))
     print("Precision Score:",precision_score(true_improve,pred_improve))
     print("Recall Score:",recall_score(true_improve,pred_improve))
 
-sys.stdout = open('treatment_responsiveness.txt','w')
+
 xgboost_model(df)
