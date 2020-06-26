@@ -333,6 +333,7 @@ def xgboost_model(df):
                 inner_y_pred_proba[validation_idx] = selector.predict_proba(inner_X_validation)[:,1]
                 validation_scores.append(get_validation_score(inner_groups,validation_idx,inner_y_pred_proba))
             grid_scores[n_features] = np.mean(validation_scores)
+            sys.stdout.flush()
 
 
         plt.figure()
