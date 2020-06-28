@@ -333,7 +333,12 @@ def xgboost_model(df):
 
         inner_groups = df.loc[train_idx,'record_id']
 
-        grid_scores = {}
+ 
+        manager = Manager()
+
+        grid_scores = manager.dict()
+        pool = multiprocessing.Pool()
+
         for n_features in range(1, len(attributes)+1):
             print("Trying", n_features,"features...")
             validation_scores = []
@@ -376,12 +381,10 @@ def xgboost_model(df):
 
         outer_fold += 1
         print()
-        sys.stdout.flush()
     print("Outer CV Accuracy:",np.mean(test_error)*100)
 
     print(confusion_matrix(true_improve, pred_improve, labels=[0,1]))
     print("Precision Score:",precision_score(true_improve,pred_improve))
     print("Recall Score:",recall_score(true_improve,pred_improve))
 
-sys.stdout = open('treatment_responsiveness.txt','w')
 xgboost_model(df)

@@ -18,6 +18,7 @@ from sklearn.metrics import precision_score, accuracy_score, recall_score, f1_sc
 from sklearn.utils.multiclass import unique_labels
 from sklearn.feature_selection import RFECV, RFE
 from itertools import compress
+import seaborn as sns
 
 
 # In[28]:
@@ -294,8 +295,20 @@ def xgboost_model(df):
     attributes = list(df.columns)
     attributes.remove('improve_0.5')
     attributes.remove('record_id')
-    attributes.remove('improve_ratio')
-    X = np.array(df.loc[:,attributes])
+    attributes.remove('improve_ratio')  
+
+    X = df.loc[:,attributes]
+    corr = X.corr()
+
+    columns = np.full((corr.shape[0],), True, dtype=bool)
+    for i in range(corr.shape[0]):
+        for j in range(i+1, corr.shape[0]):
+            if corr.iloc[i,j] >= 0.9:
+                if columns[j]:
+                    columns[j] = False
+    selected_columns = X.columns[columns]
+
+    X = np.array(X[selected_columns])
     y = np.array(df["improve_0.5"])
 
     logo = LeaveOneGroupOut()
@@ -311,7 +324,7 @@ def xgboost_model(df):
     outer_fold = 1
     for train_idx, test_idx in logo.split(X,y,groups):
         print("[Outer Fold "+str(outer_fold)+"]")
-        logfile.write("[ Outer Fold"+str(outer_fold)+"]\n")
+        logfile.write("[Outer Fold "+str(outer_fold)+"]\n")
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
 
@@ -320,7 +333,7 @@ def xgboost_model(df):
 
         grid_scores = {}
         for n_features in range(1, len(attributes)+1):
-            print("Trying"+str(n_features)+"features...")
+            print("Trying "+str(n_features)+" features...")
             logfile.write("Trying "+str(n_features)+" features...\n")
             validation_scores = []
             inner_y_pred_proba = np.zeros(inner_groups.shape[0])
@@ -330,7 +343,7 @@ def xgboost_model(df):
                 inner_X_train, inner_X_validation = X_train[inner_train_idx],X_train[validation_idx]
 
                 selection_model = xgb.XGBClassifier(objective="binary:logistic", n_jobs = -1)
-                selector = RFE(selection_model, n_features_to_select= n_features, step = 1)
+                selector = RFE(selection_model, n_features_to_select= n_features, step = 2)
                 selector = selector.fit(inner_X_train, inner_y_train)
 
                 inner_y_pred_proba[validation_idx] = selector.predict_proba(inner_X_validation)[:,1]
@@ -353,7 +366,7 @@ def xgboost_model(df):
 
 
         estimator = xgb.XGBClassifier(objective="binary:logistic", n_jobs = -1)
-        rfe = RFE(estimator, n_features_to_select= optimal_n_features, step = 1)
+        rfe = RFE(estimator, n_features_to_select= optimal_n_features, step = 2)
         rfe = rfe.fit(X_train, y_train)
         chosen_features = list(compress(attributes, rfe.support_))
         chosen_features_str = ','.join(chosen_features)
@@ -366,21 +379,23 @@ def xgboost_model(df):
         #feature_importance = np.append(feature_importance, [estimator.feature_importances_], axis = 0)
 
         outer_fold += 1
-        print("Generalized Accuracy to this Point:",np.mean(test_error)*100)
+        print("Generalized Accuracy to this Point: ",np.mean(test_error)*100)
         logfile.write("Generalized Accuracy to this Point: "+str(np.mean(test_error)*100)+"\n")
         logfile.write("\n\n")
         print()
-    print("Outer CV Accuracy:"+str(np.mean(test_error)*100))
+    print("Outer CV Accuracy: "+str(np.mean(test_error)*100))
     logfile.write("Outer CV Accuracy: "+str(np.mean(test_error)*100)+"\n")
     try:
         logfile.write(confusion_matrix(true_improve, pred_improve, labels=[0,1]))
     except:
         pass
     print(confusion_matrix(true_improve, pred_improve, labels=[0,1]))
-    print("Precision Score:"+str(precision_score(true_improve,pred_improve)))
-    print("Recall Score:"+str(recall_score(true_improve,pred_improve)))
+    print("Precision Score: "+str(precision_score(true_improve,pred_improve)))
+    print("Recall Score: "+str(recall_score(true_improve,pred_improve)))
     logfile.write("Precision Score: "+str(precision_score(true_improve,pred_improve))+"\n")
     logfile.write("Recall Score: "+str(recall_score(true_improve,pred_improve))+"\n")
+
+
 
 
 xgboost_model(df)
