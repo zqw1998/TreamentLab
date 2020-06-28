@@ -260,7 +260,7 @@ def get_index_range(groups, record_id):
 
 
 def calc_pred_label(pred_array, start_index, end_index):
-    mean_proba = np.mean(pred_array[start_index:(end_index + 1)])
+    mean_proba = np.median(pred_array[start_index:(end_index + 1)])
     if mean_proba > 0.5:
         return 1
     else:
@@ -351,13 +351,14 @@ def xgboost_model(df):
             grid_scores[n_features] = np.mean(validation_scores)
 
 
-
+        '''
         plt.figure()
         plt.xlabel("Number of features selected")
         plt.ylabel("Cross validation score (nb of correct classifications)")
         plt.plot(range(1, len(grid_scores) + 1), list(grid_scores.values()))
         plt.savefig('cv_performance'+str(outer_fold)+'.png')
-
+        '''
+        
         optimal_n_features = max(grid_scores.items(), key=operator.itemgetter(1))[0]
         print("Optimal number of features:"+str(optimal_n_features))
         print("Inner CV Score:"+str(max(grid_scores.values())))
