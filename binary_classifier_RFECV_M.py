@@ -192,8 +192,6 @@ def xgboost_model(df):
                 validation_score, pred_label, true_label = get_validation_score(inner_groups,validation_idx,inner_y_pred_proba)
                 validation_scores.append(validation_score)
             grid_scores[n_features] = np.mean(validation_scores)
-            if n_features ==3:
-                break
 
 
         '''
