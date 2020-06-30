@@ -284,7 +284,7 @@ def get_validation_score(groups, test_idx, y_pred_proba):
         true_label = get_true_label(test_record_id)
         if pred_label == true_label:
             correct_pred += 1
-    return correct_pred/total
+    return correct_pred/total, pred_label, true_label
 
 
 # In[30]:
@@ -298,17 +298,8 @@ def xgboost_model(df):
     attributes.remove('improve_ratio')  
 
     X = df.loc[:,attributes]
-    corr = X.corr()
+    X = np.array(X)
 
-    columns = np.full((corr.shape[0],), True, dtype=bool)
-    for i in range(corr.shape[0]):
-        for j in range(i+1, corr.shape[0]):
-            if corr.iloc[i,j] >= 0.9:
-                if columns[j]:
-                    columns[j] = False
-    selected_columns = X.columns[columns]
-
-    X = np.array(X[selected_columns])
     y = np.array(df["improve_0.5"])
 
     logo = LeaveOneGroupOut()
@@ -323,78 +314,43 @@ def xgboost_model(df):
 
     outer_fold = 1
     for train_idx, test_idx in logo.split(X,y,groups):
-        print("[Outer Fold "+str(outer_fold)+"]")
-        logfile.write("[Outer Fold "+str(outer_fold)+"]\n")
+        print("[Fold "+str(outer_fold)+"]")
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
 
-        inner_groups = df.loc[train_idx,'record_id']
-        group_kfold = GroupKFold(n_splits = 5)
+        train_df = df.loc[train_idx,attributes]
+        corr = train_df.corr().abs()
 
-        grid_scores = {}
-        for n_features in range(1, len(attributes)+1):
-            print("Trying "+str(n_features)+" features...")
-            logfile.write("Trying "+str(n_features)+" features...\n")
-            validation_scores = []
-            inner_y_pred_proba = np.zeros(inner_groups.shape[0])
-
-            for inner_train_idx, validation_idx in group_kfold.split(X_train,y_train,inner_groups):
-                inner_y_train, inner_y_validation = y_train[inner_train_idx], y_train[validation_idx]
-                inner_X_train, inner_X_validation = X_train[inner_train_idx],X_train[validation_idx]
-
-                selection_model = xgb.XGBClassifier(objective="binary:logistic", n_jobs = -1)
-                selector = RFE(selection_model, n_features_to_select= n_features, step = 2)
-                selector = selector.fit(inner_X_train, inner_y_train)
-
-                inner_y_pred_proba[validation_idx] = selector.predict_proba(inner_X_validation)[:,1]
-                validation_scores.append(get_validation_score(inner_groups,validation_idx,inner_y_pred_proba))
-            grid_scores[n_features] = np.mean(validation_scores)
-
-
-        '''
-        plt.figure()
-        plt.xlabel("Number of features selected")
-        plt.ylabel("Cross validation score (nb of correct classifications)")
-        plt.plot(range(1, len(grid_scores) + 1), list(grid_scores.values()))
-        plt.savefig('cv_performance'+str(outer_fold)+'.png')
-        '''
-        
-        optimal_n_features = max(grid_scores.items(), key=operator.itemgetter(1))[0]
-        print("Optimal number of features:"+str(optimal_n_features))
-        print("Inner CV Score:"+str(max(grid_scores.values())))
-        logfile.write("Optimal number of features: "+str(optimal_n_features)+"\n")
-        logfile.write("Inner CV Score: "+str(max(grid_scores.values()))+"\n")
+        columns = np.full((corr.shape[0],), True, dtype=bool)
+        for i in range(corr.shape[0]):
+            for j in range(i+1, corr.shape[0]):
+                if corr.iloc[i,j] >= 0.9:
+                    if columns[j]:
+                        columns[j] = False
+        selected_columns = train_df.columns[columns]
+        print("Columns left:", len(selected_columns))
+        selected_X_train = X_train[:,columns]
+        selected_X_test = X_test[:, columns]
 
 
         estimator = xgb.XGBClassifier(objective="binary:logistic", n_jobs = -1)
-        rfe = RFE(estimator, n_features_to_select= optimal_n_features, step = 2)
-        rfe = rfe.fit(X_train, y_train)
-        chosen_features = list(compress(attributes, rfe.support_))
-        chosen_features_str = ','.join(chosen_features)
-        print("Features Chosen:"+chosen_features_str)
-        logfile.write("Features Chosen:"+chosen_features_str+"\n")
+        estimator = estimator.fit(selected_X_train, y_train)
 
 
-        y_pred_proba[test_idx] = rfe.predict_proba(X_test)[:,1]
-        test_error.append(get_validation_score(groups, test_idx,y_pred_proba))
+        y_pred_proba[test_idx] = estimator.predict_proba(selected_X_test)[:,1]
+        validation_score, pred_label, true_label = get_validation_score(groups, test_idx,y_pred_proba)
+        test_error.append(validation_score)
+        pred_improve.append(pred_label)
+        true_improve.append(true_label)
         #feature_importance = np.append(feature_importance, [estimator.feature_importances_], axis = 0)
 
         outer_fold += 1
         print("Generalized Accuracy to this Point: ",np.mean(test_error)*100)
-        logfile.write("Generalized Accuracy to this Point: "+str(np.mean(test_error)*100)+"\n")
-        logfile.write("\n\n")
         print()
     print("Outer CV Accuracy: "+str(np.mean(test_error)*100))
-    logfile.write("Outer CV Accuracy: "+str(np.mean(test_error)*100)+"\n")
-    try:
-        logfile.write(confusion_matrix(true_improve, pred_improve, labels=[0,1]))
-    except:
-        pass
     print(confusion_matrix(true_improve, pred_improve, labels=[0,1]))
     print("Precision Score: "+str(precision_score(true_improve,pred_improve)))
     print("Recall Score: "+str(recall_score(true_improve,pred_improve)))
-    logfile.write("Precision Score: "+str(precision_score(true_improve,pred_improve))+"\n")
-    logfile.write("Recall Score: "+str(recall_score(true_improve,pred_improve))+"\n")
 
 
 
